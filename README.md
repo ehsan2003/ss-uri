@@ -1,0 +1,1 @@
+a shadowsocks uri parser inspired by https://github.com/Jigsaw-Code/outline-shadowsocksconfig
