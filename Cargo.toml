@@ -1,6 +1,6 @@
 [package]
 name = "ss-uri"
-license="Apache 2.0"
+license="Apache-2.0"
 description = "shadowsocks uri parser inspired by https://github.com/Jigsaw-Code/outline-shadowsocksconfig"
 homepage = "https://github.com/ehsan2003/ss-uri"
 version = "0.1.0"
