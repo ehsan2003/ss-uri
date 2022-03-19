@@ -17,6 +17,7 @@ pub enum SIP008ParseError {
 }
 
 impl SIP008Config {
+    // parses shadowsocks SIP008 https://shadowsocks.org/en/wiki/SIP008-Online-Configuration-Delivery.html
     pub fn parse(input: &str) -> Result<Self, SIP008ParseError> {
         let url = Url::parse(input).map_err(|_| SIP008ParseError::InvalidUrl)?;
         Self::validate_protocol(&url)?;

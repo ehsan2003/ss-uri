@@ -1,10 +1,12 @@
-use method::Method;
-use percent_encoding::{percent_decode_str, NON_ALPHANUMERIC};
 use core::fmt;
+use percent_encoding::{percent_decode_str, NON_ALPHANUMERIC};
 use std::collections::HashMap;
+pub use url;
 use url::{Host, Url};
 mod method;
 mod sip008;
+
+pub use method::{Method, MethodParseError};
 pub use sip008::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -27,12 +29,30 @@ pub enum SSParseError {
 }
 impl fmt::Display for SSParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f,"{:?}",self)
+        write!(f, "{:?}", self)
     }
 }
-impl std::error::Error for SSParseError {  }
+impl std::error::Error for SSParseError {}
 
 impl SSConfig {
+    /// converts SSConfig to legacy base64 shadowsocks uri
+    /// ```
+    /// use ss_uri::SSConfig;
+    /// use ss_uri::Method;
+    /// use url::Host;
+    /// let config = SSConfig {
+    ///     host: Host::parse("192.168.100.1").unwrap(),
+    ///     port: 8888,
+    ///     method: Method::BfCfb,
+    ///     password: "test".to_string(),
+    ///     tag: Some("Foo Bar".to_string()),
+    ///     extra: None,
+    /// };
+    /// assert_eq!(
+    ///     config.to_legacy_base64_encoded(),
+    ///     "ss://YmYtY2ZiOnRlc3RAMTkyLjE2OC4xMDAuMTo4ODg4#Foo%20Bar"
+    /// );
+    /// ```
     pub fn to_legacy_base64_encoded(&self) -> String {
         let SSConfig {
             host,
@@ -48,6 +68,24 @@ impl SSConfig {
 
         format!("ss://{encoded}{hash}")
     }
+    /// converts SSConfig to shadowsocks sip002 format
+    /// ```
+    /// use ss_uri::SSConfig;
+    /// use ss_uri::Method;
+    /// use url::Host;
+    /// let config = SSConfig {
+    ///     host: Host::parse("192.168.100.1").unwrap(),
+    ///     port: 8888,
+    ///     method: Method::Aes128Gcm,
+    ///     password: "test".to_string(),
+    ///     tag: Some("Foo Bar".to_string()),
+    ///     extra: None,
+    /// };
+    /// assert_eq!(
+    ///     config.to_sip002(),
+    ///     "ss://YWVzLTEyOC1nY206dGVzdA@192.168.100.1:8888/#Foo%20Bar"
+    /// );
+    /// ```
     pub fn to_sip002(&self) -> String {
         let SSConfig {
             host,
@@ -69,7 +107,36 @@ impl SSConfig {
         let host = Self::get_uri_formatted_host(host);
         format!("ss://{user_info}@{host}:{port}/{query}{hash}")
     }
-
+    /// this is the method you should usually use for parsing shadowsocks uris
+    /// parses an string into shadowsocks uri it supports both [sip002](https://shadowsocks.org/en/wiki/SIP002-URI-Scheme.html) and legacy mode if both were invalid returns sip002's error
+    /// sip002 example:
+    /// ```
+    ///     use ss_uri::SSConfig;
+    ///     use url::Host;
+    ///     use ss_uri::Method;
+    ///     let config = SSConfig::parse("ss://YWVzLTEyOC1nY206dGVzdA@192.168.100.1:8888#Foo%20Bar").unwrap();
+    ///     assert_eq!(config.method, Method::Aes128Gcm);
+    ///     assert_eq!(config.password,"test");
+    ///     assert_eq!(config.host, Host::parse("192.168.100.1").unwrap());
+    ///     assert_eq!(config.port, 8888);
+    ///     assert_eq!(config.tag, Some("Foo Bar".to_string()));
+    ///
+    /// ```
+    /// legacy uri example:
+    /// ```
+    /// use ss_uri::SSConfig;
+    /// use url::Host;
+    /// use ss_uri::Method;
+    /// let input = "ss://YmYtY2ZiOnRlc3RAMTkyLjE2OC4xMDAuMTo4ODg4#Foo Bar";
+    /// let config = SSConfig::parse_legacy_base64(input).unwrap();
+    ///
+    /// assert_eq!(config.method, Method::BfCfb);
+    /// assert_eq!(config.password, "test");
+    /// assert_eq!(config.host, Host::parse("192.168.100.1").unwrap());
+    /// assert_eq!(config.port, 8888);
+    /// assert_eq!(config.tag, Some("Foo Bar".to_string()));
+    /// assert_eq!(config.extra, None);
+    /// ```
     pub fn parse(s: &str) -> Result<Self, SSParseError> {
         let result = Self::parse_sip002(s);
         if result.is_ok() {
@@ -232,6 +299,33 @@ impl SSConfig {
 
 #[cfg(test)]
 mod tests {
+    mod generic {
+        use super::super::*;
+        #[test]
+        fn should_parse_a_valid_sip002() {
+            let config =
+                SSConfig::parse("ss://YWVzLTEyOC1nY206dGVzdA@192.168.100.1:8888#Foo%20Bar")
+                    .unwrap();
+
+            assert_eq!((config.method), ("aes-128-gcm").try_into().unwrap());
+            assert_eq!((config.password), ("test"));
+            assert_eq!((config.host), Host::parse("192.168.100.1").unwrap());
+            assert_eq!((config.port), (8888));
+            assert_eq!((config.tag), Some("Foo Bar".into()));
+        }
+        #[test]
+        fn should_parse_a_valid_legacy_shadowsocks_uri() {
+            let input = "ss://YmYtY2ZiOnRlc3RAMTkyLjE2OC4xMDAuMTo4ODg4#Foo Bar";
+            let config = SSConfig::parse(input).unwrap();
+
+            assert_eq!(config.method, Method::BfCfb);
+            assert_eq!(config.password, "test");
+            assert_eq!(config.host, Host::parse("192.168.100.1").unwrap());
+            assert_eq!(config.port, 8888);
+            assert_eq!(config.tag, Some("Foo Bar".to_string()));
+            assert_eq!(config.extra, None);
+        }
+    }
 
     mod sip002 {
         use crate::method::Method;
@@ -433,11 +527,12 @@ mod tests {
             let input = "ss://YmYtY2ZiOnRlc3RAMTkyLjE2OC4xMDAuMTo4ODg4#Foo Bar";
             let config = SSConfig::parse_legacy_base64(input).unwrap();
 
-            assert_eq!((config.method), ("bf-cfb").try_into().unwrap());
-            assert_eq!((config.password), ("test"));
-            assert_eq!((config.host), Host::parse("192.168.100.1").unwrap());
-            assert_eq!((config.port), (8888));
-            assert_eq!((config.tag), Some("Foo Bar".into()));
+            assert_eq!(config.method, Method::BfCfb);
+            assert_eq!(config.password, "test");
+            assert_eq!(config.host, Host::parse("192.168.100.1").unwrap());
+            assert_eq!(config.port, 8888);
+            assert_eq!(config.tag, Some("Foo Bar".to_string()));
+            assert_eq!(config.extra, None);
         }
 
         #[test]

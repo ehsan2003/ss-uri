@@ -1,6 +1,7 @@
 use core::fmt;
 use std::{self, str::FromStr};
 
+// encryption method
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Method {
     Rc4Md5,
