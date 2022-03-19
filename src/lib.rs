@@ -1,5 +1,6 @@
 use method::Method;
 use percent_encoding::{percent_decode_str, NON_ALPHANUMERIC};
+use core::fmt;
 use std::collections::HashMap;
 use url::{Host, Url};
 mod method;
@@ -15,7 +16,7 @@ pub struct SSConfig {
     pub tag: Option<String>,
     pub extra: Option<HashMap<String, String>>,
 }
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone, Copy, Hash)]
 pub enum SSParseError {
     InvalidUrl,
     InvalidProtocol,
@@ -24,6 +25,12 @@ pub enum SSParseError {
     InvalidMethod,
     InvalidPassword,
 }
+impl fmt::Display for SSParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f,"{:?}",self)
+    }
+}
+impl std::error::Error for SSParseError {  }
 
 impl SSConfig {
     pub fn to_legacy_base64_encoded(&self) -> String {
@@ -223,11 +230,8 @@ impl SSConfig {
     }
 }
 
-
-
 #[cfg(test)]
 mod tests {
-    
 
     mod sip002 {
         use crate::method::Method;

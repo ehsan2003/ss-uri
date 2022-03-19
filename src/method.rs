@@ -1,3 +1,4 @@
+use core::fmt;
 use std::{self, str::FromStr};
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
@@ -22,10 +23,18 @@ pub enum Method {
     Chacha20Ietf,
     Xchacha20IetfPoly130,
 }
-#[derive(Debug,Clone,Copy,PartialEq, Eq,Hash)]
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MethodParseError {
     UnknownMethod,
 }
+impl fmt::Display for MethodParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+impl std::error::Error for MethodParseError {}
+
 impl FromStr for Method {
     type Err = MethodParseError;
 
